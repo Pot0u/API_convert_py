@@ -1,9 +1,1 @@
 flask
-os
-pdfplumber
-geopy
-pandas
-datetime
-time
-typing
-pathlib
