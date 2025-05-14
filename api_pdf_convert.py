@@ -1,30 +1,39 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 import base64
 import os
-
+from facture_to_excel import InvoiceParser
+ 
 app = Flask(__name__)
-
-@app.route('/status', methods=['GET'])
-def check_status():
-    bonjour_value = request.headers.get('bonjour', 'Valeur par défaut')
-    return jsonify({"message": f"L'application fonctionne correctement.", "bonjour": bonjour_value}), 200
-
+ 
 @app.route('/upload', methods=['POST'])
 def upload_file():
     data = request.get_json()
-    filename = data.get('filename')
+    filename = data.get('filename', 'fichier.pdf')
     filecontent_base64 = data.get('filecontent')
-    
+ 
     try:
-        file_bytes = base64.b64decode(filecontent_base64)
-        with open(filename, 'wb') as f:
-            f.write(file_bytes)
-        
-        return jsonify({"message": f"Fichier {filename} reçu et sauvegardé avec succès."}), 200
+        # Sauvegarder le fichier PDF temporairement
+        pdf_path = f"/tmp/{filename}"
+        with open(pdf_path, 'wb') as f:
+            f.write(base64.b64decode(filecontent_base64))
+ 
+        # Utiliser ton script existant pour convertir en Excel
+        parser = InvoiceParser()
+        parser.parse_pdf(pdf_path)
+        excel_path = pdf_path.replace('.pdf', '.xlsx')
+        parser.export_to_excel(excel_path)
+ 
+        # Renvoyer le fichier Excel en réponse
+        return send_file(
+            excel_path,
+            as_attachment=True,
+            download_name=os.path.basename(excel_path),
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+ 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-
+ 
 if __name__ == '__main__':
-    # Replit fournit automatiquement un PORT dans les variables d'environnement
     port = int(os.environ.get("PORT", 3000))
     app.run(host='0.0.0.0', port=port)
