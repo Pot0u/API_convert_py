@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 import base64
 import os
 from facture_to_excel import InvoiceParser
@@ -12,24 +12,17 @@ def upload_file():
     filecontent_base64 = data.get('filecontent')
  
     try:
-        # Sauvegarder le fichier PDF temporairement
+        # Sauvegarde du PDF temporaire
         pdf_path = f"/tmp/{filename}"
         with open(pdf_path, 'wb') as f:
             f.write(base64.b64decode(filecontent_base64))
  
-        # Utiliser ton script existant pour convertir en Excel
+        # Utiliser InvoiceParser pour parser le PDF
         parser = InvoiceParser()
-        parser.parse_pdf(pdf_path)
-        excel_path = pdf_path.replace('.pdf', '.xlsx')
-        parser.export_to_excel(excel_path)
+        result = parser.parse_pdf(pdf_path)
  
-        # Renvoyer le fichier Excel en réponse
-        return send_file(
-            excel_path,
-            as_attachment=True,
-            download_name=os.path.basename(excel_path),
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
+        # Retourner le JSON directement
+        return jsonify(result), 200
  
     except Exception as e:
         return jsonify({"error": str(e)}), 400
