@@ -4,6 +4,10 @@ import os
 
 app = Flask(__name__)
 
+@app.route('/status', methods=['GET'])
+def check_status():
+    return jsonify({"message": "L'application fonctionne correctement."}), 200
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     data = request.get_json()
