@@ -6,7 +6,8 @@ app = Flask(__name__)
 
 @app.route('/status', methods=['GET'])
 def check_status():
-    return jsonify({"message": "L'application fonctionne correctement."}), 200
+    bonjour_value = request.headers.get('bonjour', 'Valeur par défaut')
+    return jsonify({"message": f"L'application fonctionne correctement.", "bonjour": bonjour_value}), 200
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
