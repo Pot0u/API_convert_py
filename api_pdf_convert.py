@@ -27,8 +27,7 @@ def upload_file():
                 "numero_commande": result.get("numero_commande"),
                 "ville": result.get("ville"),
                 "total_ht": result.get("total_ht"),
-            },
-            "excel_file_base64": excel_base64
+            }
         }
  
         # Retourner le JSON directement
