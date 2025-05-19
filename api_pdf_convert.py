@@ -20,9 +20,19 @@ def upload_file():
         # Utiliser InvoiceParser pour parser le PDF
         parser = InvoiceParser()
         result = parser.parse_pdf(pdf_path)
+
+        custom_response = {
+            "items": result["items"],
+            "globalite": {
+                "numero_commande": result.get("numero_commande"),
+                "ville": result.get("ville"),
+                "total_ht": result.get("total_ht"),
+            },
+            "excel_file_base64": excel_base64
+        }
  
         # Retourner le JSON directement
-        return jsonify(result), 200
+        return jsonify(custom_response), 200
  
     except Exception as e:
         return jsonify({"error": str(e)}), 400
