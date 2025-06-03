@@ -201,8 +201,9 @@ class InvoiceParser:
                 # Extraire les informations numériques de la ligne
                 for j, tok in enumerate(parts[2:], start=2):
                     # Si on a déjà trouvé une quantité et une unité, ne pas les écraser
-                    if not current["quantite"] and re.fullmatch(r"\d+[\.,]?\d*", tok):
+                    if not current["quantite"] and re.fullmatch(r"\d+(?:[.,]\d+)?", tok):
                         if j + 1 < len(parts) and not re.search(r"\d", parts[j+1]):
+                            # On garde la quantité telle quelle, avec la virgule si présente
                             current["quantite"] = tok
                             current["unite"] = parts[j+1]
                             # Chercher le prix unitaire juste après l'unité
@@ -544,8 +545,8 @@ class InvoiceParser:
             for item in items_data:
                 if item.get('prix_unitaire'):
                     item['prix_unitaire'] = self._clean_number(item['prix_unitaire'])
-                if item.get('quantite'):
-                    item['quantite'] = self._clean_number(item['quantite'])
+                # if item.get('quantite'):
+                #     item['quantite'] = self._clean_number(item['quantite'])
             
             # Créer le DataFrame pour les items
             df_items = pd.DataFrame(items_data)
