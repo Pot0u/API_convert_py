@@ -401,6 +401,8 @@ class InvoiceParser:
                     return None
                 if word.lower().startswith('de '):
                     return None
+                if all(c.isdigit() or c.isspace() for c in word):
+                    return None
                 if "rte" in word.lower() or "kv" in word.lower():
                     return None
                 if (len(word) < 3 or word.isdigit() or word.lower() in excluded_words):
