@@ -22,15 +22,10 @@ Dépendances :
 
 import os
 from typing import List, Dict, Any, Union
-from collections import defaultdict
 import pdfplumber
 import re
-from geopy.geocoders import Nominatim
 import pandas as pd
 from datetime import datetime
-import time
-
-geolocator = Nominatim(user_agent="detect-ville")
 
 class InvoiceParser:
     """
@@ -41,17 +36,15 @@ class InvoiceParser:
         global_delivery_date (str|None) : Date de livraison globale trouvée dans le PDF.
         last_result (dict|None) : Dernier résultat d'extraction.
         pdf_path (str|None) : Chemin du PDF en cours de traitement.
-        geolocator (Nominatim) : Instance du géocodeur pour la validation des villes.
     """
 
     def __init__(self):
         """
-        Initialise le parser et le géocodeur.
+        Initialise le parser.
         """
         self.global_delivery_date = None
         self.last_result = None
         self.pdf_path = None
-        self.geolocator = Nominatim(user_agent="detect-ville", timeout=5)
 
     def _is_valid_date(self, day: str, month: str, year: str) -> bool:
         """
@@ -318,7 +311,8 @@ class InvoiceParser:
             self.global_delivery_date = self._extract_global_date(first_page_text)
             print(f"Date de livraison globale trouvée: {self.global_delivery_date}")
             numero_commande = self._extract_order_number(first_page_text)
-            ville = self.find_city(pdf_path)
+            objet = self.find_objet(pdf_path)
+            lieu_livraison = self.find_lieux_livraison(pdf_path)
             for page_num, page in enumerate(pdf.pages, 1):
                 print(f"Traitement de la page {page_num}...")
                 text = page.extract_text()
@@ -342,7 +336,8 @@ class InvoiceParser:
             "items": all_items,
             "total_ht": total_ht,
             "numero_commande": numero_commande,
-            "ville": ville
+            "objet": objet,
+            "lieu_livraison": lieu_livraison,
         }
         self.last_result = result
         return result
@@ -367,171 +362,6 @@ class InvoiceParser:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 return match.group(1)
-        return None
-
-    def _extract_ville(self, text: str) -> str:
-        """
-        Extrait le nom de ville potentiel d'une ligne de texte.
-        Utilise le géocodeur pour vérifier si la chaîne correspond à une ville réelle.
-
-        Args:
-            text (str): Ligne à analyser.
-
-        Returns:
-            str: Ville trouvée ou chaîne vide.
-        """
-        def is_valid_city(word: str) -> Union[str, None]:
-            """
-            Vérifie si le mot est une ville réelle via Nominatim.
-            Exclut certains mots-clés métiers ou techniques.
-            """
-            try:
-                excluded_words = [
-                    "poste de", "poste rte", "poste electrique", "rte", "(rte)",
-                    "poteau", "rouge", "poste", "je", "electrique", "électrique",
-                    "droite", "colonnes", "trois", "90kv", "smart", "jacquelin", "jeremy"
-                ]
-                first_word = word.strip().split()[0].lower() if word.strip() else ""
-                if first_word == "de":
-                    return None
-                if all(c.isdigit() or c.isspace() for c in word):
-                    return None
-                if word.lower().startswith('de '):
-                    return None
-                if all(c.isdigit() or c.isspace() for c in word):
-                    return None
-                if "rte" in word.lower() or "kv" in word.lower():
-                    return None
-                if (len(word) < 3 or word.isdigit() or word.lower() in excluded_words):
-                    return None
-                time.sleep(1)  # Limite le débit des requêtes Nominatim
-                location = self.geolocator.geocode(word, exactly_one=True)
-                if location:
-                    return word
-                return None
-            except Exception:
-                return None
-
-        words = text.strip().split()
-        if not words:
-            return ""
-        # On teste d'abord les groupes de 3, puis 2, puis 1 mots depuis la fin de la ligne
-        for length in range(3, 0, -1):
-            for i in range(len(words) - 1, length - 2, -1):
-                word_group = " ".join(words[i - length + 1:i + 1]).strip('.,;:-').strip()
-                if city := is_valid_city(word_group):
-                    return city
-        return ""
-
-    def extract_left_lines_after_obj(self, page_number: int = 0, n_lines: int = 3) -> List[str]:
-        """
-        Extrait les lignes de gauche après le mot 'OBJET' sur une page PDF.
-        Permet de cibler la zone où la ville est souvent mentionnée.
-
-        Args:
-            page_number (int): Numéro de la page à analyser.
-            n_lines (int): Nombre de lignes à extraire.
-
-        Returns:
-            list[str]: Lignes extraites.
-        """
-        with pdfplumber.open(self.pdf_path) as pdf:
-            page = pdf.pages[page_number]
-            words = page.extract_words(use_text_flow=True)
-            try:
-                obj = next(w for w in words if w['text'].strip().lower().startswith('objet'))
-                y_obj = obj['top']
-            except StopIteration:
-                return []
-            # On ne prend que les mots situés sous "OBJET" et dans la partie gauche de la page
-            left_boundary = page.width * 0.6
-            left_words = [w for w in words if w['top'] > y_obj and w['x1'] < left_boundary]
-            lines_dict = defaultdict(list)
-            for w in left_words:
-                key = round(w['top'], 1)
-                lines_dict[key].append(w)
-            sorted_tops = sorted(lines_dict.keys())
-            left_lines = []
-            for top in sorted_tops[:n_lines]:
-                line_words = sorted(lines_dict[top], key=lambda w: w['x0'])
-                line = " ".join(w['text'] for w in line_words)
-                left_lines.append(line)
-            return left_lines
-
-    def is_valid_city(self, city_name: str) -> bool:
-        """
-        Vérifie si le nom correspond à une ville valide via Nominatim.
-
-        Args:
-            city_name (str): Nom à vérifier.
-
-        Returns:
-            bool: True si c'est une ville valide, False sinon.
-        """
-        try:
-            if "kv" in city_name.lower():
-                return False
-            location = self.geolocator.geocode(city_name, exactly_one=True)
-            if not location:
-                return False
-            lieu_class = location.raw.get('class')
-            lieu_type = location.raw.get('type')
-            # On accepte les villes, zones administratives, cours d'eau et routes
-            is_valid = (lieu_class == 'place' and lieu_type in ['city', 'town', 'village']) or \
-                       (lieu_class == 'boundary' and lieu_type == 'administrative') or \
-                       (lieu_class in ['waterway', "highway"])
-            return is_valid
-        except Exception:
-            return False
-
-    def _find_city_after_keywords(self, text: str) -> Union[str, None]:
-        """
-        Cherche une ville après des mots-clés spécifiques dans le texte (ex : "POSTE ELECTRIQUE DE ...").
-
-        Args:
-            text (str): Texte à analyser.
-
-        Returns:
-            str|None: Ville trouvée ou None.
-        """
-        patterns = [
-            r"POSTE\s+ELECTRIQUE\s+DE\s+([^\n\.,]+)",
-            r"POSTE\s+RTE\s+DE\s+([^\n\.,]+)"
-        ]
-        for pattern in patterns:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            for match in matches:
-                potential_city = match.group(1).strip()
-                if city := self._extract_ville(potential_city):
-                    return city
-                words = potential_city.split()
-                if len(words) >= 2:
-                    two_words = " ".join(words[:2])
-                    if city := self._extract_ville(two_words):
-                        return city
-        return None
-
-    def find_city(self, pdf_path: str) -> str:
-        """
-        Processus complet d'extraction et validation de ville à partir du PDF.
-
-        Args:
-            pdf_path (str): Chemin du fichier PDF.
-
-        Returns:
-            str|None: Ville trouvée ou None.
-        """
-        self.pdf_path = pdf_path
-        # On tente d'abord dans les lignes après "OBJET"
-        lines = self.extract_left_lines_after_obj(page_number=0, n_lines=2)
-        for line in lines:
-            if city := self._extract_ville(line):
-                return city
-        # Sinon, on cherche après les mots-clés dans tout le texte
-        with pdfplumber.open(pdf_path) as pdf:
-            full_text = "\n".join(page.extract_text() for page in pdf.pages)
-            if city := self._find_city_after_keywords(full_text):
-                return city
         return None
 
     def _clean_number(self, value: str) -> str:
@@ -562,14 +392,12 @@ class InvoiceParser:
             items_data = self.last_result["items"].copy()
             for item in items_data:
                 item['numero_commande'] = self.last_result.get('numero_commande', '')
-                item['ville'] = self.last_result.get('ville', '')
             for item in items_data:
                 if item.get('prix_unitaire'):
                     item['prix_unitaire'] = self._clean_number(item['prix_unitaire'])
             df_items = pd.DataFrame(items_data)
             column_names = {
                 'numero_commande': 'Numéro de commande',
-                'ville': 'Ville',
                 'position': 'Position',
                 'designation': 'Référence',
                 'nom_produit': 'Désignation',
@@ -579,7 +407,7 @@ class InvoiceParser:
                 'date_livraison': 'Date de livraison'
             }
             columns_order = [
-                'numero_commande', 'ville', 'position', 'designation', 'nom_produit',
+                'numero_commande', 'position', 'designation', 'nom_produit',
                 'quantite', 'unite', 'prix_unitaire', 'date_livraison'
             ]
             df_items = df_items[columns_order].rename(columns=column_names)
@@ -599,7 +427,8 @@ class InvoiceParser:
                 df_items.to_excel(writer, sheet_name='Items', index=False)
                 df_global = pd.DataFrame({
                     'Numéro de commande': [self.last_result.get('numero_commande', '')],
-                    'Ville': [self.last_result.get('ville', '')],
+                    'Objet': [self.last_result.get('objet', '')],
+                    'Lieu de livraison': [self.last_result.get('lieu_livraison', '')],
                     'Total HT': [self._clean_number(self.last_result.get('total_ht', ''))]
                 })
                 df_global.to_excel(writer, sheet_name='Informations globales', index=False)
@@ -622,6 +451,58 @@ class InvoiceParser:
             print(f"Erreur lors de la création du fichier Excel : {str(e)}")
             raise
 
+    def extract_lines_after_objet(self, pdf_path: str, page_number: int = 0) -> list:
+        """
+        Extrait les lignes après 'OBJET' jusqu'à 'CONTRAT N°' (exclue).
+        """
+        with pdfplumber.open(pdf_path) as pdf:
+            page = pdf.pages[page_number]
+            lines = page.extract_text().splitlines()
+            objet_lines = []
+            found_objet = False
+            for line in lines:
+                if not found_objet:
+                    if "objet" in line.lower():
+                        found_objet = True
+                    continue
+                # Arrêt si on trouve 'CONTRAT N°'
+                if "contrat n" in line.lower():
+                    break
+                if line.strip():
+                    objet_lines.append(line.strip())
+            return objet_lines
+
+    def find_objet(self, pdf_path: str) -> str:
+        """
+        Retourne le texte de l'objet (après 'OBJET' jusqu'à 'CONTRAT N°').
+        """
+        lines = self.extract_lines_after_objet(pdf_path)
+        return " ".join(lines) if lines else ""
+
+    def find_lieux_livraison(self, pdf_path: str) -> str:
+        """
+        À implémenter : retourne le lieu de livraison.
+        """
+        # À adapter avec les coordonnées réelles
+        return self.extract_zone_text(pdf_path, page_number=0, x0=20, top=425, x1=228, bottom=514)
+
+    def extract_zone_text(self, pdf_path: str, page_number: int, x0: float, top: float, x1: float, bottom: float) -> str:
+        """
+        Extrait le texte d'une zone précise d'une page PDF et retire l'entête d'adresse de livraison.
+        """
+        with pdfplumber.open(pdf_path) as pdf:
+            page = pdf.pages[page_number]
+            zone = page.crop((x0, top, x1, bottom))
+            texte = zone.extract_text() or ""
+            # Suppression de la phrase d'entête (même si elle est sur plusieurs lignes)
+            texte = re.sub(
+                r"Adresse de livraison, lieu de\s*réception ou d'exécution\s*:", 
+                "", 
+                texte, 
+                flags=re.IGNORECASE
+            )
+            return texte.strip()
+
 if __name__ == "__main__":
     print("=== Convertisseur PDF vers Excel ===")
     while True:
@@ -643,5 +524,7 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"\nErreur lors du traitement : {str(e)}")
         print("\n" + "="*50)
+texte_lieu = parser.extract_zone_text(pdf_path, page_number=0, x0=50, top=200, x1=400, bottom=300)
+print(texte_lieu)
 
 

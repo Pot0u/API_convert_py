@@ -51,25 +51,12 @@ def upload_file():
     """
     Endpoint principal de l'API.
     Reçoit un PDF encodé en base64, l'analyse et retourne les informations extraites.
-
-    Attendu en entrée (JSON):
-        - filename: nom du fichier PDF (optionnel)
-        - filecontent: contenu du PDF encodé en base64
-
-    Retour:
-        - 200: JSON structuré avec items et globalité
-        - 400: JSON d'erreur en cas de problème
-
-    Exceptions:
-        - Retourne une erreur 400 si le décodage ou le parsing échoue.
     """
     data = request.get_json()
     filename = data.get('filename', 'fichier.pdf')
     filecontent_base64 = data.get('filecontent')
 
     try:
-        # On sauvegarde le PDF décodé dans un fichier temporaire pour le parser.
-        # Cela permet de réutiliser le même code que pour l'usage en local.
         pdf_path = f"/tmp/{filename}"
         with open(pdf_path, 'wb') as f:
             f.write(base64.b64decode(filecontent_base64))
@@ -83,7 +70,7 @@ def upload_file():
                 item["quantite"] = clean_fr_number(item["quantite"])
             if "prix_unitaire" in item and item["prix_unitaire"]:
                 item["prix_unitaire"] = clean_fr_number(item["prix_unitaire"])
-            if "montant_total" in item and item["montant_total"]:
+            if "montant_total" in item and item.get("montant_total"):
                 item["montant_total"] = clean_fr_number(item["montant_total"])
 
         if "total_ht" in result and result["total_ht"]:
@@ -93,15 +80,15 @@ def upload_file():
             "items": result["items"],
             "globalite": {
                 "numero_commande": result.get("numero_commande"),
-                "ville": result.get("ville"),
+                "objet": result.get("objet"),
+                "lieu_livraison": result.get("lieu_livraison"),
                 "total_ht": result.get("total_ht"),
             }
         }
- 
+
         return jsonify(custom_response), 200
- 
+
     except Exception as e:
-        # On retourne l'erreur au client pour faciliter le debug côté front ou client API.
         return jsonify({"error": str(e)}), 400
  
 if __name__ == '__main__':
