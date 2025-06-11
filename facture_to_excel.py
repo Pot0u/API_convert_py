@@ -524,7 +524,4 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"\nErreur lors du traitement : {str(e)}")
         print("\n" + "="*50)
-texte_lieu = parser.extract_zone_text(pdf_path, page_number=0, x0=50, top=200, x1=400, bottom=300)
-print(texte_lieu)
-
 
