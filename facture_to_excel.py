@@ -502,7 +502,7 @@ class InvoiceParser:
     def extract_zone_text(self, pdf_path: str, page_number: int, x0: float, top: float, x1: float, bottom: float) -> str:
         """
         Extrait le texte d'une zone précise d'une page PDF et retire l'entête d'adresse de livraison.
-        Met tout le résultat sur une seule ligne.
+        Garde les retours à la ligne pour permettre une séparation ligne par ligne.
         """
         with pdfplumber.open(pdf_path) as pdf:
             page = pdf.pages[page_number]
@@ -515,8 +515,6 @@ class InvoiceParser:
                 texte, 
                 flags=re.IGNORECASE
             )
-            # Remplace tous les retours à la ligne par un espace
-            texte = re.sub(r'[\r\n]+', ' ', texte)
             return texte.strip()
 
 if __name__ == "__main__":
