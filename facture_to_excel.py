@@ -425,13 +425,26 @@ class InvoiceParser:
                     print(f"Fichier existant verrouillé, utilisation du nouveau nom: {output_path}")
             with pd.ExcelWriter(output_path, engine='openpyxl', mode='w') as writer:
                 df_items.to_excel(writer, sheet_name='Items', index=False)
+                # Informations globales : objet et lieu de livraison sur une seule ligne
                 df_global = pd.DataFrame({
                     'Numéro de commande': [self.last_result.get('numero_commande', '')],
-                    'Objet': [self.last_result.get('objet', '')],
-                    'Lieu de livraison': [self.last_result.get('lieu_livraison', '')],
+                    'Objet': [self.last_result.get('objet', '').replace('\n', ' ').replace('\r', ' ')],
+                    'Lieu de livraison': [self.last_result.get('lieu_livraison', '').replace('\n', ' ').replace('\r', ' ')],
                     'Total HT': [self._clean_number(self.last_result.get('total_ht', ''))]
                 })
                 df_global.to_excel(writer, sheet_name='Informations globales', index=False)
+
+                # Feuille Objet : chaque ligne sur une ligne Excel
+                objet_lines = self.extract_lines_after_objet(self.pdf_path)
+                df_objet = pd.DataFrame({'Objet': objet_lines})
+                df_objet.to_excel(writer, sheet_name='Objet', index=False)
+
+                # Feuille Lieu de livraison : chaque ligne sur une ligne Excel
+                lieu_livraison_lines = self.last_result.get('lieu_livraison', '').replace('\r', '').split('\n')
+                lieu_livraison_lines = [line.strip() for line in lieu_livraison_lines if line.strip()]
+                df_lieu = pd.DataFrame({'Lieu de livraison': lieu_livraison_lines})
+                df_lieu.to_excel(writer, sheet_name='Lieu de livraison', index=False)
+
                 # Ajuste automatiquement la largeur des colonnes pour une meilleure lisibilité
                 for sheet_name in writer.sheets:
                     worksheet = writer.sheets[sheet_name]

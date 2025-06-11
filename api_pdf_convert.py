@@ -76,6 +76,11 @@ def upload_file():
         if "total_ht" in result and result["total_ht"]:
             result["total_ht"] = clean_fr_number(result["total_ht"])
 
+        # Extraction des lignes pour objet et lieu de livraison
+        objet_lines = parser.extract_lines_after_objet(pdf_path)
+        lieu_livraison_lines = result.get("lieu_livraison", "").replace('\r', '').split('\n')
+        lieu_livraison_lines = [line.strip() for line in lieu_livraison_lines if line.strip()]
+
         custom_response = {
             "items": result["items"],
             "globalite": {
@@ -83,7 +88,9 @@ def upload_file():
                 "objet": result.get("objet"),
                 "lieu_livraison": result.get("lieu_livraison"),
                 "total_ht": result.get("total_ht"),
-            }
+            },
+            "objet": objet_lines,
+            "lieu_livraison": lieu_livraison_lines
         }
 
         return jsonify(custom_response), 200
