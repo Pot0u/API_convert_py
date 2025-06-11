@@ -21,11 +21,8 @@ Dépendances :
 """
 
 import os
-import json
 from typing import List, Dict, Any, Union
 from collections import defaultdict
-from pathlib import Path
-
 import pdfplumber
 import re
 from geopy.geocoders import Nominatim
