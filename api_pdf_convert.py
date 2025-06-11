@@ -78,8 +78,11 @@ def upload_file():
 
         # Extraction des lignes pour objet et lieu de livraison
         objet_lines = parser.extract_lines_after_objet(pdf_path)
+        objet_json = [{"objet": line} for line in objet_lines]
+
         lieu_livraison_lines = result.get("lieu_livraison", "").replace('\r', '').split('\n')
         lieu_livraison_lines = [line.strip() for line in lieu_livraison_lines if line.strip()]
+        lieu_livraison_json = [{"lieu_livraison": line} for line in lieu_livraison_lines]
 
         custom_response = {
             "items": result["items"],
@@ -87,8 +90,8 @@ def upload_file():
                 "numero_commande": result.get("numero_commande"),
                 "total_ht": result.get("total_ht"),
             },
-            "objet": objet_lines,
-            "lieu_livraison": lieu_livraison_lines
+            "objet": objet_json,
+            "lieu_livraison": lieu_livraison_json
         }
 
         return jsonify(custom_response), 200
