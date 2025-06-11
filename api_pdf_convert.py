@@ -85,8 +85,6 @@ def upload_file():
             "items": result["items"],
             "globalite": {
                 "numero_commande": result.get("numero_commande"),
-                "objet": result.get("objet"),
-                "lieu_livraison": result.get("lieu_livraison"),
                 "total_ht": result.get("total_ht"),
             },
             "objet": objet_lines,
