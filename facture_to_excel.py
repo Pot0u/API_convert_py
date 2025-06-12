@@ -5,8 +5,7 @@ Module principal pour l'extraction d'informations structurées à partir de fact
 et l'export de ces données vers un fichier Excel.
 
 Fonctionnalités principales :
-- Extraction des lignes d'items, des dates, des montants et de la ville depuis un PDF.
-- Validation des villes via Nominatim (OpenStreetMap).
+- Extraction des lignes d'items, des dates, des montants, de l'objet et du lieu de livraison depuis un PDF.
 - Export des résultats dans un fichier Excel structuré.
 
 Auteur  : Lam Clément
@@ -29,7 +28,7 @@ from datetime import datetime
 
 class InvoiceParser:
     """
-    Permet d'extraire les informations structurées d'une facture PDF (items, ville, date, etc.)
+    Permet d'extraire les informations structurées d'une facture PDF (items, objet, lieu, etc.)
     et de les exporter vers Excel.
 
     Attributs :
@@ -302,7 +301,7 @@ class InvoiceParser:
             pdf_path (str): Chemin du fichier PDF.
 
         Returns:
-            dict: Résultat contenant items, total_ht, numero_commande, ville.
+            dict: Résultat contenant items, total_ht, numero_commande, objet, lieu_livraison.
         """
         all_items: List[Dict[str, Any]] = []
         all_texts: List[str] = []
@@ -467,6 +466,13 @@ class InvoiceParser:
     def extract_lines_after_objet(self, pdf_path: str, page_number: int = 0) -> list:
         """
         Extrait les lignes après 'OBJET' jusqu'à 'CONTRAT N°' (exclue).
+
+        Args:
+            pdf_path (str): Chemin du PDF.
+            page_number (int): Numéro de la page à analyser.
+
+        Returns:
+            list: Lignes extraites.
         """
         with pdfplumber.open(pdf_path) as pdf:
             page = pdf.pages[page_number]
@@ -488,21 +494,41 @@ class InvoiceParser:
     def find_objet(self, pdf_path: str) -> str:
         """
         Retourne le texte de l'objet (après 'OBJET' jusqu'à 'CONTRAT N°').
+
+        Args:
+            pdf_path (str): Chemin du PDF.
+
+        Returns:
+            str: Texte de l'objet.
         """
         lines = self.extract_lines_after_objet(pdf_path)
         return " ".join(lines) if lines else ""
 
     def find_lieux_livraison(self, pdf_path: str) -> str:
         """
-        À implémenter : retourne le lieu de livraison.
+        Extrait le texte du lieu de livraison à partir d'une zone précise du PDF.
+
+        Args:
+            pdf_path (str): Chemin du PDF.
+
+        Returns:
+            str: Texte du lieu de livraison.
         """
-        # À adapter avec les coordonnées réelles
+        # À adapter avec les coordonnées réelles selon le format du PDF
         return self.extract_zone_text(pdf_path, page_number=0, x0=20, top=425, x1=228, bottom=514)
 
     def extract_zone_text(self, pdf_path: str, page_number: int, x0: float, top: float, x1: float, bottom: float) -> str:
         """
         Extrait le texte d'une zone précise d'une page PDF et retire l'entête d'adresse de livraison.
         Garde les retours à la ligne pour permettre une séparation ligne par ligne.
+
+        Args:
+            pdf_path (str): Chemin du PDF.
+            page_number (int): Numéro de la page.
+            x0, top, x1, bottom (float): Coordonnées de la zone à extraire.
+
+        Returns:
+            str: Texte extrait de la zone.
         """
         with pdfplumber.open(pdf_path) as pdf:
             page = pdf.pages[page_number]

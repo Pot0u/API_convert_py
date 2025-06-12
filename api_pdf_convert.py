@@ -6,9 +6,9 @@ et retourner le résultat en JSON.
 
 Fonctionnalités principales :
 - Décode le PDF reçu en base64 et le sauvegarde temporairement.
-- Utilise InvoiceParser pour extraire les données structurées.
+- Utilise InvoiceParser pour extraire les données structurées (items, objet, lieu, etc.).
 - Nettoie les champs numériques pour un format français cohérent.
-- Retourne un JSON structuré avec les items et les informations globales.
+- Retourne un JSON structuré avec les items, l'objet, le lieu de livraison et les informations globales.
 
 Auteur  : Lam Clément
 Date    : 2024-06
@@ -51,12 +51,24 @@ def upload_file():
     """
     Endpoint principal de l'API.
     Reçoit un PDF encodé en base64, l'analyse et retourne les informations extraites.
+
+    Entrée attendue (JSON):
+        - filename: nom du fichier PDF (optionnel)
+        - filecontent: contenu du PDF encodé en base64
+
+    Retour:
+        - 200: JSON structuré avec items, globalité, objet, lieu_livraison
+        - 400: JSON d'erreur en cas de problème
+
+    Exceptions:
+        - Retourne une erreur 400 si le décodage ou le parsing échoue.
     """
     data = request.get_json()
     filename = data.get('filename', 'fichier.pdf')
     filecontent_base64 = data.get('filecontent')
 
     try:
+        # On sauvegarde le PDF décodé dans un fichier temporaire pour le parser.
         pdf_path = f"/tmp/{filename}"
         with open(pdf_path, 'wb') as f:
             f.write(base64.b64decode(filecontent_base64))
@@ -76,7 +88,7 @@ def upload_file():
         if "total_ht" in result and result["total_ht"]:
             result["total_ht"] = clean_fr_number(result["total_ht"])
 
-        # Extraction des lignes pour objet et lieu de livraison
+        # Extraction des lignes pour objet et lieu de livraison (pour affichage détaillé)
         objet_lines = parser.extract_lines_after_objet(pdf_path)
         objet_json = [{"objet": line} for line in objet_lines]
 
@@ -97,6 +109,7 @@ def upload_file():
         return jsonify(custom_response), 200
 
     except Exception as e:
+        # On retourne l'erreur au client pour faciliter le debug côté front ou client API.
         return jsonify({"error": str(e)}), 400
  
 if __name__ == '__main__':
