@@ -28,7 +28,7 @@ app = Flask(__name__)
 
 def clean_fr_number(val: str) -> str:
     """
-    Nettoie un nombre au format français : garde la virgule, enlève les zéros inutiles après la virgule.
+    Nettoie un nombre au format français : enlève les points, garde la virgule.
 
     Args:
         val (str): Nombre à nettoyer.
@@ -38,6 +38,7 @@ def clean_fr_number(val: str) -> str:
     """
     if not isinstance(val, str):
         return val
+    val = val.replace('.', '')  # Enlève les séparateurs de milliers
     if ',' in val:
         entier, dec = val.split(',')
         dec = dec.rstrip('0')
